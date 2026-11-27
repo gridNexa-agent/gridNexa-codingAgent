@@ -1,49 +1,22 @@
 import { NextResponse } from "next/server";
 
-import { SandboxFactory } from "@/lib/sandbox/factory";
-import { readPreviewSandbox } from "@/lib/sandbox/preview-store";
-import { sandboxManager } from "@/lib/sandbox/sandbox-manager";
-import "@/types/sandbox";
+import { listSessionPreviewFiles } from "@/lib/sandbox/session-preview";
 
 export const runtime = "nodejs";
 
-async function resolveProvider() {
-  let provider = sandboxManager.getActiveProvider() ?? globalThis.activeSandboxProvider;
-  if (provider?.isAlive()) return provider;
-
-  const stored = await readPreviewSandbox();
-  if (!stored?.sandboxId) return null;
-  provider = SandboxFactory.create("vercel");
-  const info = await provider.reconnect(stored.sandboxId);
-  sandboxManager.registerSandbox(info.sandboxId, provider);
-  globalThis.activeSandboxProvider = provider;
-  globalThis.sandboxData = { sandboxId: info.sandboxId, url: info.url };
-  return provider;
-}
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const provider = await resolveProvider();
-    if (!provider) {
-      return NextResponse.json({ error: "No active preview sandbox" }, { status: 404 });
+    const sessionId = new URL(request.url).searchParams.get("sessionId")?.trim();
+    if (!sessionId) {
+      return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
     }
 
-    // Prefer in-memory cache seeded at create / apply time (open-lovable style).
-    const cached = globalThis.sandboxState?.fileCache?.files;
-    if (cached && Object.keys(cached).length > 0) {
-      const files = Object.keys(cached).sort((a, b) => a.localeCompare(b));
-      return NextResponse.json({
-        success: true,
-        source: "cache",
-        files,
-        count: files.length,
-      });
-    }
-
-    const files = (await provider.listFiles()).sort((a, b) => a.localeCompare(b));
+    const listed = await listSessionPreviewFiles(sessionId);
+    const files = listed.files.sort((a, b) => a.localeCompare(b));
     return NextResponse.json({
       success: true,
-      source: "sandbox",
+      source: "session-sandbox",
+      appRoot: listed.appRoot,
       files,
       count: files.length,
     });

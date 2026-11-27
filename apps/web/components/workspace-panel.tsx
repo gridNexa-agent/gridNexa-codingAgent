@@ -110,15 +110,13 @@ export function WorkspacePanel({
   files,
   sandboxData,
   onSandboxData,
-  applying,
-  applyError,
+  sessionId,
 }: {
   readonly className?: string;
   readonly files: readonly GenerationFile[];
   readonly sandboxData: SandboxData | null;
   readonly onSandboxData: (data: SandboxData | null) => void;
-  readonly applying?: boolean;
-  readonly applyError?: string;
+  readonly sessionId?: string;
 }) {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("preview");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -127,19 +125,26 @@ export function WorkspacePanel({
   const [error, setError] = useState<string>();
   const [iframeKey, setIframeKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const wasApplyingRef = useRef(false);
+  const previousFilesSignatureRef = useRef<string>("");
 
   const tree = useMemo(() => buildFileTree([...files]), [files]);
   const selected = files.find((file) => file.path === selectedFile);
 
-  // First apply often replaces the default "Vite sandbox is ready" App — one reload
-  // after apply finishes ensures the iframe picks it up if HMR missed the write.
+  // Soft-reload iframe when generated/edited files change so HMR misses still show up.
   useEffect(() => {
-    if (wasApplyingRef.current && !applying && sandboxData?.url) {
+    const signature = files
+      .filter((file) => file.completed)
+      .map((file) => `${file.path}:${file.content.length}`)
+      .join("|");
+    if (!sandboxData?.url || !signature || signature === previousFilesSignatureRef.current) {
+      previousFilesSignatureRef.current = signature;
+      return;
+    }
+    if (previousFilesSignatureRef.current) {
       setIframeKey((key) => key + 1);
     }
-    wasApplyingRef.current = Boolean(applying);
-  }, [applying, sandboxData?.url]);
+    previousFilesSignatureRef.current = signature;
+  }, [files, sandboxData?.url]);
 
   useEffect(() => {
     if (files.length === 0) {
@@ -164,10 +169,13 @@ export function WorkspacePanel({
   }, [files]);
 
   useEffect(() => {
+    if (!sessionId) return;
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch("/api/preview/status");
+        const response = await fetch(
+          `/api/preview/status?sessionId=${encodeURIComponent(sessionId)}`,
+        );
         const payload = (await response.json()) as {
           active?: boolean;
           sandboxId?: string | null;
@@ -182,37 +190,28 @@ export function WorkspacePanel({
     return () => {
       cancelled = true;
     };
-  }, [onSandboxData]);
+  }, [onSandboxData, sessionId]);
 
   const createPreview = useCallback(async () => {
+    if (!sessionId) {
+      setError("Send a message first so a chat session exists, then start preview.");
+      return;
+    }
     setBusy(true);
     setError(undefined);
     try {
-      const completed = files
-        .filter((file) => file.completed && file.content.length > 0)
-        .map((file) => ({ path: file.path, content: file.content }));
       const response = await fetch("/api/preview/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ files: completed }),
+        body: JSON.stringify({ sessionId }),
       });
       const payload = (await response.json()) as {
         sandboxId?: string;
         url?: string;
         error?: string;
-        written?: string[];
-        appHead?: string;
       };
       if (!response.ok || !payload.sandboxId || !payload.url) {
-        throw new Error(payload.error || "Failed to create preview sandbox");
-      }
-      if (
-        completed.some((file) => file.path === "src/App.jsx" || file.path.endsWith("/App.jsx")) &&
-        payload.appHead?.includes("Vite sandbox is ready")
-      ) {
-        throw new Error(
-          "Sandbox created but src/App.jsx is still the default template — generated files did not land in Vite root.",
-        );
+        throw new Error(payload.error || "Failed to start session preview");
       }
       onSandboxData({ sandboxId: payload.sandboxId, url: payload.url });
       setActiveTab("preview");
@@ -222,20 +221,24 @@ export function WorkspacePanel({
     } finally {
       setBusy(false);
     }
-  }, [files, onSandboxData]);
+  }, [onSandboxData, sessionId]);
 
   const killPreview = useCallback(async () => {
     setBusy(true);
     setError(undefined);
     try {
-      await fetch("/api/preview/kill", { method: "POST" });
+      await fetch("/api/preview/kill", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
       onSandboxData(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Kill failed");
     } finally {
       setBusy(false);
     }
-  }, [onSandboxData]);
+  }, [onSandboxData, sessionId]);
 
   const refreshIframe = useCallback(() => {
     // Manual reload only — normal code apply relies on Vite HMR like open-lovable.
@@ -259,8 +262,8 @@ export function WorkspacePanel({
             <Code2Icon className="size-6 text-muted-foreground" />
             <p className="text-sm font-medium">Code</p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              This panel shows AI-generated files from the chat session (write_file), not a live
-              sandbox filesystem listing.
+              Shows write_file / edit_file outputs from this chat. Preview runs Vite in the same Eve
+              session sandbox those tools already write to.
             </p>
           </div>
         );
@@ -324,12 +327,12 @@ export function WorkspacePanel({
             </div>
           </aside>
 
-          <div className="flex min-w-0 flex-1 flex-col bg-[#0d1117]">
-            <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-xs text-zinc-300">
+          <div className="flex min-w-0 flex-1 flex-col bg-[#f6f8fa]">
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
               {selected ? fileIcon(selected.path) : <FileIcon className="size-3.5" />}
               <span className="truncate font-mono">{selected?.path ?? "Select a file"}</span>
               {selected && !selected.completed ? (
-                <span className="ml-auto text-[10px] uppercase tracking-wide text-emerald-400">
+                <span className="ml-auto text-[10px] uppercase tracking-wide text-emerald-600">
                   streaming
                 </span>
               ) : null}
@@ -343,7 +346,7 @@ export function WorkspacePanel({
                   showLineNumbers
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   Select a file
                 </div>
               )}
@@ -356,11 +359,11 @@ export function WorkspacePanel({
     // Preview tab — the only iframe, pointing at sandbox public URL (open-lovable model).
     return (
       <div className="absolute inset-0 overflow-hidden bg-zinc-950">
-        {(busy || applying) && (
+        {busy && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-950/70">
             <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm">
               <LoaderCircleIcon className="size-4 animate-spin" />
-              {busy ? "Starting sandbox…" : "Applying code to sandbox…"}
+              Starting Vite in session sandbox…
             </div>
           </div>
         )}
@@ -378,12 +381,16 @@ export function WorkspacePanel({
             <EyeIcon className="size-6 text-muted-foreground" />
             <p className="text-sm font-medium">Preview</p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              Starts a Vite sandbox and loads its public URL in this iframe. Code updates are written
-              into the sandbox so Vite HMR refreshes the page — the Code tab itself never reads the
-              sandbox filesystem.
+              Starts Vite inside the Eve session sandbox (same FS as write_file / edit_file). After
+              the agent has written app files, start preview and HMR will pick up later edits.
             </p>
-            <Button disabled={busy} onClick={() => void createPreview()} type="button" variant="outline">
-              {busy ? "Creating…" : "Start preview sandbox"}
+            <Button
+              disabled={busy || !sessionId}
+              onClick={() => void createPreview()}
+              type="button"
+              variant="outline"
+            >
+              {busy ? "Starting…" : "Start preview"}
             </Button>
           </div>
         )}
@@ -456,7 +463,7 @@ export function WorkspacePanel({
               </>
             ) : (
               <Button
-                disabled={busy}
+                disabled={busy || !sessionId}
                 onClick={() => void createPreview()}
                 size="sm"
                 type="button"
@@ -468,11 +475,11 @@ export function WorkspacePanel({
           </div>
         </header>
 
-        {(error || applyError) && (
+        {error ? (
           <div className="border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {error || applyError}
+            {error}
           </div>
-        )}
+        ) : null}
 
         <div className="relative min-h-0 flex-1 overflow-hidden">{renderMainContent()}</div>
       </section>

@@ -1,12 +1,12 @@
-/** Preview sandbox settings (ported from open-lovable v2 Vite-on-sandbox flow). */
+/** Preview settings for Vite running inside the Eve session sandbox. */
 export const previewConfig = {
   vitePort: 5173,
   /** Wait after starting `npm run dev` before treating preview as ready. */
   viteStartupDelayMs: 8_000,
-  /** Vercel Sandbox idle timeout. */
-  timeoutMs: 15 * 60 * 1000,
-  /** Working directory inside the Vercel Sandbox image. */
-  workingDirectory: "/vercel/sandbox",
-  /** Managed image for @vercel/sandbox v5. */
+  /** Vercel Sandbox wall-clock timeout for legacy/reconnect paths. */
+  timeoutMs: 3 * 60 * 60 * 1000,
+  /** Eve session workspace root (shared by write_file / edit_file / Preview). */
+  workingDirectory: "/workspace",
+  /** Managed image for legacy standalone create path only. */
   image: "vercel/sandbox/node:22" as const,
 };

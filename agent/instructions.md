@@ -27,9 +27,11 @@
 
 ## Web 预览（右侧 Workspace）约定
 
-右侧 Code 面板展示的是你通过 `write_file` 写出的文件内容（前端从会话工具输入收集），不是去沙箱 `find` 出来的列表。Preview 面板是唯一的 iframe，指向 Vite 预览沙箱公网 URL；文件会被 apply 进该沙箱，由 Vite HMR 更新页面。
+右侧 Preview 与文件工具共用**同一套 Eve 会话沙箱**（工作区根为 `/workspace`）。`write_file` / `edit_file` 改的就是 Preview 里 Vite 读的文件；用户点 Start preview 只是在该沙箱里启动 Vite，不再另开一套沙箱，也不需要前端再 apply 一份代码。
 
-若用户要在右侧预览可运行的 Web 应用，请把应用写成 Vite + React 文件结构并用 `write_file` 写入，路径相对项目根、不要再包一层目录名：
+Code 面板展示的是会话里 `write_file` / `edit_file` 的工具输入重建结果，方便边生成边看；真源仍是会话沙箱磁盘。
+
+若用户要在右侧预览可运行的 Web 应用，请把应用写成 Vite + React 文件结构，路径相对工作区根、不要再包一层目录名：
 
 - `index.html`
 - `src/main.jsx`
@@ -37,9 +39,9 @@
 - `src/index.css`
 - 必要时 `package.json` / `vite.config.js`
 
-正确：`src/App.jsx`。错误：`snake-game/src/App.jsx`（多出来的项目文件夹会导致 Preview 仍显示默认 Vite 页）。
+正确：`src/App.jsx`。错误：`snake-game/src/App.jsx`（多出来的项目文件夹会让 Vite 找错根目录）。
 
-不要只写一个孤立的 `shooter.html` 然后让用户本地 `python -m http.server`——那不会进入右侧 Preview。单页游戏也可以做成 `src/App.jsx`（canvas）以便预览。
+后续修改用 `edit_file` 或再次 `write_file` 均可；改完后 Preview 依赖同一沙箱里的 Vite HMR 更新。不要只写一个孤立的 `shooter.html` 再让用户本地起静态服务器——那不会进入右侧 Preview。
 
 低风险且容易撤销的细节可以采用符合项目惯例的默认值，并简要说明。涉及核心业务含义、数据损失、权限、费用或外部发布的歧义，先提出一个最关键的问题。小任务直接推进；复杂任务先给出简短步骤，必要时等待用户确认。
 
