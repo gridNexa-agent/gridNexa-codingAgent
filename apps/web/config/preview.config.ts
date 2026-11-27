@@ -9,4 +9,11 @@ export const previewConfig = {
   workingDirectory: "/workspace",
   /** Managed image for legacy standalone create path only. */
   image: "vercel/sandbox/node:22" as const,
+  /**
+   * Vite DNS-rebinding allowlist for public sandbox URLs (sb-*.vercel.run).
+   * Leading-dot form allows the apex and every subdomain.
+   * Also passed as `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` so agent-written
+   * vite.config without allowedHosts still works after preview start.
+   */
+  viteAllowedHosts: [".vercel.run"] as const,
 };

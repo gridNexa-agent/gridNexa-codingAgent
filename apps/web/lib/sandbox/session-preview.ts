@@ -28,6 +28,15 @@ export type SessionPreviewHandle = {
   appRoot: string;
 };
 
+const VITE_ALLOWED_HOSTS_LITERAL = JSON.stringify([...previewConfig.viteAllowedHosts]);
+
+/** Env Vite reads in addition to server.allowedHosts (survives agent config overwrites). */
+function viteAllowedHostsEnv(): Record<string, string> {
+  return {
+    __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: previewConfig.viteAllowedHosts.join(","),
+  };
+}
+
 function previewViteConfigSource(): string {
   return `import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -38,11 +47,70 @@ export default defineConfig({
     host: '0.0.0.0',
     port: ${previewConfig.vitePort},
     strictPort: true,
-    allowedHosts: true,
+    // Public Vercel Sandbox URLs are sb-*.vercel.run — required for iframe preview.
+    allowedHosts: ${VITE_ALLOWED_HOSTS_LITERAL},
     hmr: { clientPort: 443, protocol: 'wss' },
   },
 })
 `;
+}
+
+/**
+ * Inject allowedHosts into an existing Vite config without wiping agent plugins.
+ * Falls back to returning the original source when the shape is unfamiliar.
+ */
+export function injectViteAllowedHosts(source: string): string {
+  if (/allowedHosts\s*:/.test(source)) {
+    return source.replace(
+      /allowedHosts\s*:\s*(?:true|false|\[[^\]]*\]|'[^']*'|"[^"]*")/,
+      `allowedHosts: ${VITE_ALLOWED_HOSTS_LITERAL}`,
+    );
+  }
+
+  if (/server\s*:\s*\{/.test(source)) {
+    return source.replace(/server\s*:\s*\{/, `server: {\n    allowedHosts: ${VITE_ALLOWED_HOSTS_LITERAL},`);
+  }
+
+  if (/defineConfig\s*\(\s*\{/.test(source)) {
+    return source.replace(
+      /defineConfig\s*\(\s*\{/,
+      `defineConfig({\n  server: { allowedHosts: ${VITE_ALLOWED_HOSTS_LITERAL} },`,
+    );
+  }
+
+  if (/export\s+default\s*\{/.test(source)) {
+    return source.replace(
+      /export\s+default\s*\{/,
+      `export default {\n  server: { allowedHosts: ${VITE_ALLOWED_HOSTS_LITERAL} },`,
+    );
+  }
+
+  return source;
+}
+
+async function writeSandboxFile(sandbox: Sandbox, path: string, content: string): Promise<void> {
+  try {
+    await sandbox.writeFiles([{ path, content: Buffer.from(content, "utf-8") }]);
+    return;
+  } catch {
+    // Fall through to shell write — some sandbox sessions reject certain writeFiles shapes.
+  }
+
+  const encoded = Buffer.from(content, "utf-8").toString("base64");
+  const result = await sandbox.runCommand({
+    cmd: "sh",
+    args: [
+      "-c",
+      'mkdir -p "$(dirname "$1")" && printf %s "$2" | base64 -d > "$1"',
+      "write",
+      path,
+      encoded,
+    ],
+  });
+  const parsed = await readCommandResult(result);
+  if (!parsed.success) {
+    throw new Error(`Failed to write ${path}: ${parsed.stderr || parsed.stdout}`);
+  }
 }
 
 async function run(
@@ -192,12 +260,38 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     ]);
   }
 
-  await sandbox.writeFiles([
-    {
-      path: `${appRoot}/vite.config.js`,
-      content: Buffer.from(previewViteConfigSource(), "utf-8"),
-    },
-  ]);
+  await ensurePreviewViteConfig(sandbox, appRoot);
+}
+
+/**
+ * Keep Vite reachable on sb-*.vercel.run even when the agent rewrites vite.config
+ * without allowedHosts. Prefer patching every vite.config.* over clobbering plugins.
+ */
+async function ensurePreviewViteConfig(sandbox: Sandbox, appRoot: string): Promise<void> {
+  const listed = await run(
+    sandbox,
+    `ls -1 vite.config.js vite.config.ts vite.config.mjs vite.config.mts vite.config.cjs vite.config.cts 2>/dev/null || true`,
+    appRoot,
+  );
+  const configs = listed.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (configs.length === 0) {
+    await writeSandboxFile(sandbox, `${appRoot}/vite.config.js`, previewViteConfigSource());
+    return;
+  }
+
+  for (const name of configs) {
+    const fullPath = `${appRoot}/${name}`;
+    const existing = await run(sandbox, `cat ${JSON.stringify(name)}`, appRoot);
+    if (!existing.success) continue;
+    const patched = injectViteAllowedHosts(existing.stdout);
+    if (patched !== existing.stdout) {
+      await writeSandboxFile(sandbox, fullPath, patched);
+    }
+  }
 }
 
 async function ensureDependencies(sandbox: Sandbox, appRoot: string): Promise<void> {
@@ -223,6 +317,8 @@ async function restartVite(sandbox: Sandbox, appRoot: string): Promise<void> {
     args: ["run", "dev"],
     cwd: appRoot,
     detached: true,
+    // Belt-and-suspenders: even if vite.config omits allowedHosts, Vite still allows .vercel.run.
+    env: viteAllowedHostsEnv(),
   });
 }
 
