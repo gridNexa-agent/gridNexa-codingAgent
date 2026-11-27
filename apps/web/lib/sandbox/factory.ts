@@ -24,11 +24,19 @@ export class SandboxFactory {
 
   static isProviderAvailable(provider: string): boolean {
     if (provider.toLowerCase() !== "vercel") return false;
-    return (
-      !!process.env.VERCEL_OIDC_TOKEN ||
-      (!!process.env.VERCEL_TOKEN &&
-        !!process.env.VERCEL_TEAM_ID &&
-        !!process.env.VERCEL_PROJECT_ID)
-    );
+    // Local: pulled OIDC token (`vercel env pull` / `eve link`).
+    if (process.env.VERCEL_OIDC_TOKEN) return true;
+    // Explicit API token path.
+    if (
+      process.env.VERCEL_TOKEN &&
+      process.env.VERCEL_TEAM_ID &&
+      process.env.VERCEL_PROJECT_ID
+    ) {
+      return true;
+    }
+    // On Vercel, @vercel/sandbox resolves OIDC via getVercelOidcToken() —
+    // VERCEL_OIDC_TOKEN is not a persistent project env var.
+    if (process.env.VERCEL && process.env.VERCEL_PROJECT_ID) return true;
+    return false;
   }
 }

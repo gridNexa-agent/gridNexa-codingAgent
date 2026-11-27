@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 export type StoredPreviewSandbox = {
@@ -9,7 +10,13 @@ export type StoredPreviewSandbox = {
 };
 
 function storePath() {
-  return join(process.cwd(), ".eve", "preview-sandbox.json");
+  // Vercel/Lambda ships a read-only filesystem under /var/task; only /tmp is writable.
+  // Locally keep the store under the app's .eve directory.
+  const base =
+    process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+      ? join(tmpdir(), "gridnexa-codingagent")
+      : join(process.cwd(), ".eve");
+  return join(base, "preview-sandbox.json");
 }
 
 export async function savePreviewSandbox(

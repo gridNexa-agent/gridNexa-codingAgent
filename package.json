@@ -13,6 +13,7 @@
     "eval": "eve eval",
     "start": "eve start",
     "typecheck": "tsc",
+    "dev:all": "vercel dev --local",
     "dev:web": "next dev apps/web",
     "build:web": "next build apps/web",
     "typecheck:web": "tsc --project apps/web/tsconfig.json --noEmit"
