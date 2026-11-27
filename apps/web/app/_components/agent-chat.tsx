@@ -19,7 +19,7 @@ import {
   PlusIcon,
   SquareIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -59,9 +59,6 @@ export function AgentChat({
   // Workspace/preview panel is opt-in. Do not open a sandbox just because chat loaded.
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [sandboxData, setSandboxData] = useState<SandboxData | null>(null);
-  const [applying, setApplying] = useState(false);
-  const [applyError, setApplyError] = useState<string>();
-  const lastAppliedRef = useRef<string>("");
   const hasSubmittedMessage = useRef(false);
   const replaceSessionRoute = (nextSessionId: string) => {
     if (sessionId !== undefined) return;
@@ -95,67 +92,15 @@ export function AgentChat({
   });
 
   const isBusy = agent.status === "busy";
-  // open-lovable Code panel: React state from AI/tool outputs, not sandbox find/cat.
+  // Code panel: React state from write_file + edit_file tool inputs (not a live FS listing).
+  // Preview iframe points at the same Eve session sandbox, so tool writes update via Vite HMR.
   const generationFiles = useMemo(
     () => extractGenerationFiles(agent.view),
     [agent.view],
   );
 
-  // When completed files change and a preview sandbox is live, apply into Vite sandbox
-  // so HMR updates the iframe (same writeFiles → Vite path as open-lovable).
-  useEffect(() => {
-    if (!sandboxData || generationFiles.length === 0) return;
-    const completed = generationFiles.filter((file) => file.completed && file.content.length > 0);
-    if (completed.length === 0) return;
-    const signature = completed
-      .map((file) => `${file.path}:${file.content.length}:${hashContent(file.content)}`)
-      .join("|");
-    if (signature === lastAppliedRef.current) return;
-
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        setApplying(true);
-        setApplyError(undefined);
-        try {
-          const response = await fetch("/api/preview/apply", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              files: completed.map((file) => ({ path: file.path, content: file.content })),
-            }),
-          });
-          const payload = (await response.json()) as { error?: string };
-          if (!response.ok) {
-            throw new Error(payload.error || "Failed to apply files to preview sandbox");
-          }
-          if (!cancelled) lastAppliedRef.current = signature;
-        } catch (cause) {
-          if (!cancelled) {
-            setApplyError(cause instanceof Error ? cause.message : "Apply failed");
-          }
-        } finally {
-          if (!cancelled) setApplying(false);
-        }
-      })();
-    }, 600);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [generationFiles, sandboxData]);
-
   const handleSandboxData = useCallback((data: SandboxData | null) => {
-    // create terminates the old sandbox then boots a fresh Vite template.
-    // Always clear the apply signature when sandboxId changes so files are
-    // written into the NEW sandbox (logs previously showed apply → create wipe).
-    setSandboxData((previous) => {
-      if (!data || previous?.sandboxId !== data.sandboxId) {
-        lastAppliedRef.current = "";
-      }
-      return data;
-    });
+    setSandboxData(data);
   }, []);
 
   // A turn waiting on a person is open while the store is idle; it still takes steering and Stop.
@@ -253,7 +198,7 @@ export function AgentChat({
       <div
         className={cn(
           "flex min-w-0 flex-1 flex-col overflow-hidden",
-          workspaceOpen && "xl:max-w-[min(42vw,28rem)] xl:flex-none",
+          workspaceOpen && "md:max-w-[min(42vw,28rem)] md:flex-none",
         )}
       >
         <ChatHeader
@@ -324,12 +269,11 @@ export function AgentChat({
 
       {workspaceOpen ? (
         <WorkspacePanel
-          applying={applying}
-          applyError={applyError}
-          className="hidden min-w-0 flex-1 xl:flex"
+          className="hidden min-w-0 flex-1 md:flex"
           files={generationFiles}
           onSandboxData={handleSandboxData}
           sandboxData={sandboxData}
+          sessionId={activeSessionId}
         />
       ) : null}
     </main>
@@ -385,14 +329,6 @@ function ErrorMessage({ message }: { readonly message: string }) {
   );
 }
 
-function hashContent(content: string): string {
-  let hash = 0;
-  for (let index = 0; index < content.length; index += 1) {
-    hash = (hash * 31 + content.charCodeAt(index)) | 0;
-  }
-  return String(hash);
-}
-
 function ChatHeader({
   canStartNewChat,
   workspaceOpen,
@@ -411,7 +347,7 @@ function ChatHeader({
         <Button
           aria-label={workspaceOpen ? "Hide workspace" : "Show workspace"}
           aria-pressed={workspaceOpen}
-          className="hidden xl:inline-flex"
+          className="hidden md:inline-flex"
           onClick={onToggleWorkspace}
           size="sm"
           type="button"

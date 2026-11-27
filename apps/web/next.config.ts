@@ -3,6 +3,10 @@ import { withEve } from "eve/next";
 import { fileURLToPath } from "node:url";
 
 const nextConfig: NextConfig = {
+  // Local browsers often open http://127.0.0.1:3000 while next reports
+  // localhost; without this, Next blocks /_next/* and the chat form falls
+  // back to a native GET submit (?message=...) with no agent call.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   experimental: {
     agentUpgrade: "security",
   },

@@ -1,47 +1,31 @@
 import { NextResponse } from "next/server";
 
-import { SandboxFactory } from "@/lib/sandbox/factory";
-import { readPreviewSandbox, savePreviewSandbox } from "@/lib/sandbox/preview-store";
-import { sandboxManager } from "@/lib/sandbox/sandbox-manager";
-import { VercelProvider } from "@/lib/sandbox/providers/vercel-provider";
-import "@/types/sandbox";
+import { restartSessionVite } from "@/lib/sandbox/session-preview";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-async function resolveProvider() {
-  let provider = sandboxManager.getActiveProvider() ?? globalThis.activeSandboxProvider;
-  if (provider?.isAlive()) return provider;
+export async function POST(request: Request) {
+  let sessionId: string | undefined;
+  try {
+    const body = (await request.json()) as { sessionId?: string };
+    sessionId = body.sessionId?.trim();
+  } catch {
+    sessionId = undefined;
+  }
 
-  const stored = await readPreviewSandbox();
-  if (!stored?.sandboxId) return null;
-  provider = SandboxFactory.create("vercel");
-  const info = await provider.reconnect(stored.sandboxId);
-  sandboxManager.registerSandbox(info.sandboxId, provider);
-  globalThis.activeSandboxProvider = provider;
-  globalThis.sandboxData = { sandboxId: info.sandboxId, url: info.url };
-  return provider;
-}
-
-export async function POST() {
-  const provider = await resolveProvider();
-  if (!provider) {
-    return NextResponse.json({ error: "No active preview sandbox" }, { status: 404 });
+  if (!sessionId) {
+    return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
   }
 
   try {
-    await provider.restartViteServer();
-    if (provider instanceof VercelProvider) {
-      await provider.waitForViteReady();
-    }
-    const url = provider.getSandboxUrl();
-    const info = provider.getSandboxInfo();
-    if (info && url) {
-      await savePreviewSandbox({ sandboxId: info.sandboxId, url });
-    }
+    const preview = await restartSessionVite(sessionId);
     return NextResponse.json({
       success: true,
-      url,
+      url: preview.url,
+      sandboxId: preview.sandboxId,
+      appRoot: preview.appRoot,
+      sessionId,
     });
   } catch (error) {
     return NextResponse.json(

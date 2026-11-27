@@ -1,25 +1,26 @@
 import { NextResponse } from "next/server";
 
-import { clearPreviewSandbox } from "@/lib/sandbox/preview-store";
-import { sandboxManager } from "@/lib/sandbox/sandbox-manager";
-import "@/types/sandbox";
+import { stopSessionVite } from "@/lib/sandbox/session-preview";
 
 export const runtime = "nodejs";
 
-export async function POST() {
-  await sandboxManager.terminateAll();
-  if (globalThis.activeSandboxProvider) {
-    try {
-      await globalThis.activeSandboxProvider.terminate();
-    } catch {
-      // ignore
-    }
+/**
+ * Stops only the Vite preview process. Never deletes the Eve session sandbox —
+ * that would wipe the agent's workspace.
+ */
+export async function POST(request: Request) {
+  let sessionId: string | undefined;
+  try {
+    const body = (await request.json()) as { sessionId?: string };
+    sessionId = body.sessionId?.trim();
+  } catch {
+    sessionId = undefined;
   }
-  globalThis.activeSandboxProvider = undefined;
-  globalThis.sandboxData = undefined;
-  globalThis.sandboxState = undefined;
-  globalThis.existingFiles = undefined;
-  await clearPreviewSandbox();
 
-  return NextResponse.json({ success: true });
+  if (!sessionId) {
+    return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
+  }
+
+  await stopSessionVite(sessionId);
+  return NextResponse.json({ success: true, stoppedViteOnly: true, sessionId });
 }

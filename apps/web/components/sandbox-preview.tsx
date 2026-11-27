@@ -479,8 +479,8 @@ export function SandboxPreviewPanel({
                 </div>
               </aside>
 
-              <div className="flex min-w-0 flex-1 flex-col bg-[#0d1117]">
-                <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-xs text-zinc-300">
+              <div className="flex min-w-0 flex-1 flex-col bg-[#f6f8fa]">
+                <div className="flex items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
                   <FileIcon className="size-3.5 shrink-0" />
                   <span className="truncate font-mono">{selectedFile ?? "Select a file"}</span>
                   {fileLoading ? <LoaderCircleIcon className="ml-auto size-3.5 animate-spin" /> : null}
@@ -494,7 +494,7 @@ export function SandboxPreviewPanel({
                       showLineNumbers
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                       {fileLoading ? "Loading file…" : "Select a file from the explorer"}
                     </div>
                   )}
