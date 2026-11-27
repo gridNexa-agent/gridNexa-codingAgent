@@ -2,6 +2,12 @@
 
 This project uses the eve framework: an agent is a directory of files under `agent/`, and eve compiles and runs it.
 
+## Package management
+
+Use pnpm for all dependency management and script execution in this project, with Node.js 26.x. Use the developer's installed pnpm with lockfile v9 support (pnpm 9 or newer); do not pin or auto-download another package-manager version without an explicit request. Keep `managePackageManagerVersions: false` in `pnpm-workspace.yaml`. Commit `pnpm-lock.yaml` as the only dependency lockfile; do not introduce lockfiles from other package managers.
+
+Run `pnpm install --frozen-lockfile` for a reproducible install, `pnpm dev` for development, `pnpm typecheck` for type checking, and `pnpm build` for a build. Invoke the local eve CLI with `pnpm exec eve <command>`, including registry searches, integration setup, linking, and deployment. Preserve pnpm usage when an installer adds scripts or apps.
+
 For a content-only change to the root agent's identity, purpose, tone, or response guidelines, edit its existing authored instructions. Fresh projects use `agent/instructions.md`; a project may instead use `agent/instructions.ts` or files under `agent/instructions/`. You do not need to read the framework docs for a content-only instructions change. A fresh project already has its selected model in `agent/agent.ts`; preserve that file unless the user asks to change the model.
 
 ## Read the docs before writing code

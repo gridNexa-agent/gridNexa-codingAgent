@@ -1,0 +1,12 @@
+# Use the pnpm already installed on the developer's machine.
+managePackageManagerVersions: false
+
+# Preserve the exact versions already used by this project while retaining
+# pnpm's release-age protection for all other packages.
+minimumReleaseAgeExclude:
+  - "eve@1.5.0"
+  - "@types/node@26.6.7"
+
+ignoredOptionalDependencies:
+  - "@mongodb-js/zstd"
+  - "node-liblzma"

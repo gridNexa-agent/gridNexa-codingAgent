@@ -246,7 +246,7 @@ P0 阶段只使用操作者测试数据和非生产凭据，核实能力边界�
 
 ### 第一次实现只做什么
 
-建议下一步只执行 P0.1 的环境与基线检查：在用户本机或与 Node 26 及依赖平台匹配的环境确认版本，使用锁文件所需的安装方式，运行 `npm run typecheck`、`npm run build`，确认必要凭据后跑一轮最小对话。环境检查本身不应触发云部署、支付、凭据轮换或依赖升级；真实模型调用可能收费，执行前说明。
+建议下一步只执行 P0.1 的环境与基线检查：在用户本机或与 Node 26 及依赖平台匹配的环境确认版本，使用锁文件所需的安装方式，运行 `pnpm typecheck`、`pnpm build`，确认必要凭据后跑一轮最小对话。环境检查本身不应触发云部署、支付、凭据轮换或依赖升级；真实模型调用可能收费，执行前说明。
 
 第一次交付应是一份短基线结果：哪些检查通过、哪些被环境阻塞、现有模型能否完成基本工具调用，以及下一项 P0.2 验证需要什么条件。若检查发现问题，先解释并修复最小问题，不同时搭工作台、数据库和 GitHub 集成。
 
@@ -274,7 +274,7 @@ P0 阶段只使用操作者测试数据和非生产凭据，核实能力边界�
 
 [L1] [Agent 配置](../agent/agent.ts)、[现有身份说明](../agent/instructions.md)、[现有 channel](../agent/channels/eve.ts)。
 
-[L2] [package.json](../package.json)、[package-lock.json](../package-lock.json)、[TypeScript 配置](../tsconfig.json) 及本地 `node_modules/eve/package.json`。
+[L2] [package.json](../package.json)、[pnpm-lock.yaml](../pnpm-lock.yaml)、[TypeScript 配置](../tsconfig.json) 及本地 `node_modules/eve/package.json`。
 
 [L3] Eve 1.5.0 本地文档：`node_modules/eve/docs/concepts/execution-model-and-durability.mdx`、`concepts/sessions-runs-and-streaming.md`，重点是恢复、版本升级、重连及保留行为。
 
