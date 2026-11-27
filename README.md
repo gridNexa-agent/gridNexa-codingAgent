@@ -53,7 +53,7 @@ pnpm build:web
 
 ### 模型凭据与访问控制
 
-页面能打开不代表模型凭据已验证。当前 `alibaba/qwen3.7-flash` 仍通过 AI Gateway 调用。需要使用环境变量时，可将根目录 `.env.example` 复制为 `apps/web/.env.local`，在本机填入有效的 `AI_GATEWAY_API_KEY`，然后重启 Web 开发服务；不要把密钥填到聊天框或带 `NEXT_PUBLIC_` 前缀的变量中。终端 `/login` 的密钥库登录记录不能单独作为该 Web 进程已经拿到可用凭据的证据。
+页面能打开不代表模型凭据已验证。当前 `deepseek/deepseek-v4-flash` 仍通过 AI Gateway 调用。需要使用环境变量时，可将根目录 `.env.example` 复制为 `apps/web/.env.local`，在本机填入有效的 `AI_GATEWAY_API_KEY`，然后重启 Web 开发服务；不要把密钥填到聊天框或带 `NEXT_PUBLIC_` 前缀的变量中。终端 `/login` 的密钥库登录记录不能单独作为该 Web 进程已经拿到可用凭据的证据。
 
 本轮保留 `agent/channels/eve.ts` 的 `localDev()` 与生产占位鉴权：本地开发可访问，生产浏览器请求默认拒绝。没有用 `none()` 关闭鉴权；正式上线前仍需实现浏览器用户认证及 session/project 资源授权。
 
