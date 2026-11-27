@@ -335,6 +335,7 @@ body {
 
   /** Known-good Vite config for Vercel Sandbox public URLs (dynamic sb-*.vercel.run). */
   previewViteConfigSource(): string {
+    const allowedHosts = JSON.stringify([...previewConfig.viteAllowedHosts]);
     return `import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -345,8 +346,7 @@ export default defineConfig({
     port: ${previewConfig.vitePort},
     strictPort: true,
     // Dynamic sandbox hostnames (sb-xxxx.vercel.run) change every create.
-    // true disables Vite's host check — required for public preview URLs.
-    allowedHosts: true,
+    allowedHosts: ${allowedHosts},
     hmr: { clientPort: 443, protocol: 'wss' },
   },
 })
@@ -377,6 +377,9 @@ export default defineConfig({
       args: ["run", "dev"],
       cwd: previewConfig.workingDirectory,
       detached: true,
+      env: {
+        __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: previewConfig.viteAllowedHosts.join(","),
+      },
     });
   }
 

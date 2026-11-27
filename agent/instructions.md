@@ -39,6 +39,8 @@ Code 面板展示的是会话里 `write_file` / `edit_file` 的工具输入重�
 - `src/index.css`
 - 必要时 `package.json` / `vite.config.js`
 
+写 `vite.config.js` / `vite.config.ts` 时必须包含 `server.allowedHosts: ['.vercel.run']`（以及 `host: '0.0.0.0'`），否则右侧 Preview 会报 `Blocked request. This host ("sb-….vercel.run") is not allowed`。不要省略这项。
+
 正确：`src/App.jsx`。错误：`snake-game/src/App.jsx`（多出来的项目文件夹会让 Vite 找错根目录）。
 
 后续修改用 `edit_file` 或再次 `write_file` 均可；改完后 Preview 依赖同一沙箱里的 Vite HMR 更新。不要只写一个孤立的 `shooter.html` 再让用户本地起静态服务器——那不会进入右侧 Preview。
