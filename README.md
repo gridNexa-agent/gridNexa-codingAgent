@@ -59,13 +59,23 @@ pnpm build:web
 
 官方安装器为 Next.js 加入 React、样式与消息渲染依赖，并将 TypeScript 从 7.0.2 调整为其模板指定的 6.0.3。启动验证时 Eve 自动补装的 `just-bash` 也已显式记录在开发依赖中，避免第一次启动时再临时安装。前后端类型检查和 Web 生产构建均已在独立的 Node 26 环境验证；没有覆盖 Mac 的 `node_modules`。
 
-## 部署
+## 部署与 CI/CD
+
+仓库已连接到 Vercel 项目 `gridnexa-codingagent`（GitHub：`gridNexa-agent/gridNexa-codingAgent`）。
+
+| 触发 | 结果 |
+| --- | --- |
+| 推送到 `main` | Vercel 自动生产部署 → https://gridnexa-codingagent.vercel.app |
+| 打开 / 更新 PR | Vercel Preview 部署 + GitHub Actions 类型检查 |
+| 推送到 `main` / PR | GitHub Actions 运行 `pnpm typecheck` 与 `pnpm typecheck:web` |
+
+本地也可手动部署：
 
 ```bash
 pnpm run deploy
 ```
 
-此命令运行项目脚本中的 `eve deploy`。它部署的是 Agent，不等于发布 Agent 生成的用户应用。上线前需要配置真实浏览器鉴权和资源授权，不能依赖占位认证。
+此命令运行 `eve deploy`。它部署的是 Agent 与 Web 服务图，不等于发布 Agent 生成的用户应用。上线前需要配置真实浏览器鉴权和资源授权，不能依赖占位认证。
 
 ## 项目资料
 
